@@ -1,24 +1,26 @@
 #!/bin/bash
-
 set -ouex pipefail
 
-### Install packages
+echo "=== Инициализация сборки HavenOS ==="
 
-# Packages can be installed from any enabled yum repo on the image.
-# RPMfusion repos are available by default in ublue main images
-# List of rpmfusion packages can be found here:
-# https://mirrors.rpmfusion.org/mirrorlist?path=free/fedora/updates/43/x86_64/repoview/index.html&protocol=https&redirect=1
+# 1. Подключаем репозиторий CachyOS
+# Это необходимо для скачивания оптимизированного ядра для твоего Ryzen 9800X3D
+curl -Lo /etc/yum.repos.d/cachyos.repo https://copr.fedorainfracloud.org/coprs/bieszczaders/kernel-cachyos/repo/fedora-$(rpm -E %fedora)/bieszczaders-kernel-cachyos-fedora-$(rpm -E %fedora).repo
 
-# this installs a package from fedora repos
-dnf5 install -y tmux 
+# 2. Замена ядра (Core Swap)
+# Вырезаем стандартное ядро Linux и ставим CachyOS
+rpm-ostree override remove kernel kernel-core kernel-modules kernel-modules-core kernel-modules-extra \
+    --install kernel-cachyos
 
-# Use a COPR Example:
-#
-# dnf5 -y copr enable ublue-os/staging
-# dnf5 -y install package
-# Disable COPRs so they don't end up enabled on the final image:
-# dnf5 -y copr disable ublue-os/staging
+# 3. Установка критических пакетов HavenOS
+# scx-scheds: BPF-планировщики для Ryzen 9800X3D
+# i2c-tools: доступ к шине SMBus для OpenRGB (управление подсветкой ASUS)
+# nvidia-open-dkms: открытые модули для RTX 5080 (Blackwell)
+rpm-ostree install scx-scheds i2c-tools nvidia-open-dkms
 
-#### Example for enabling a System Unit File
+# 4. Ребрендинг (Перезаписываем метаданные системы)
+sed -i 's/^NAME=.*/NAME="Haven"/' /usr/lib/os-release
+sed -i 's/^PRETTY_NAME=.*/PRETTY_NAME="HavenOS"/' /usr/lib/os-release
+sed -i 's/^ID=.*/ID=havenos/' /usr/lib/os-release
 
-systemctl enable podman.socket
+echo "=== Сборка HavenOS успешно сконфигурирована ==="
